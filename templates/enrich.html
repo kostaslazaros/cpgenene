@@ -65,14 +65,15 @@
               class="w-full rounded-2xl border-slate-800 bg-slate-800/70 text-cyan-300 font-mono text-sm sm:text-base px-3 py-2" />
           </div>
           <div>
-            <label class="block text-sm font-medium text-slate-300 mb-2">Library (pathways)</label>
-            <select id="library"
+            <label class="block text-sm font-medium text-slate-300 mb-2">Libraries (pathways)</label>
+            <select id="library" multiple size="4"
               class="w-full rounded-2xl border-slate-800 bg-slate-800/70 text-fuchsia-300 font-mono text-sm sm:text-base px-3 py-2">
-              <option value="Reactome_2022">Reactome_2022</option>
+              <option value="Reactome_2022" selected>Reactome_2022</option>
               <option value="KEGG_2021_Human">KEGG_2021_Human</option>
               <option value="WikiPathways_2023_Human">WikiPathways_2023_Human</option>
               <option value="BioPlanet_2019">BioPlanet_2019</option>
             </select>
+            <p class="text-xs text-slate-400 mt-1">Hold Ctrl / ⌘ to select multiple libraries</p>
           </div>
           <div id="geneCountContainer" class="hidden">
             <label class="block text-sm font-medium text-slate-300 mb-2">Number of genes to use (of <span
@@ -113,6 +114,17 @@
 
     <!-- Results -->
     <div id="results" class="hidden mt-6 space-y-6">
+      <!-- Download List -->
+      <div id="downloadList"
+        class="hidden rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur shadow-[0_0_40px_rgba(34,211,238,0.1)] p-4">
+        <h3 class="font-medium mb-3">Results per Library — click to view, <svg class="inline h-4 w-4 mb-0.5"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg> to download</h3>
+        <div id="downloadListItems" class="flex flex-wrap gap-2"></div>
+      </div>
       <!-- Bars -->
       <div
         class="rounded-2xl border border-slate-800 bg-slate-900/60 backdrop-blur shadow-[0_0_40px_rgba(34,211,238,0.15)] p-4">

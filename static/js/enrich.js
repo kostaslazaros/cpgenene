@@ -19,6 +19,8 @@ const els = {
   geneCountContainer: document.getElementById('geneCountContainer'),
   geneCountInput: document.getElementById('geneCountInput'),
   totalGenesDisplay: document.getElementById('totalGenesDisplay'),
+  downloadList: document.getElementById('downloadList'),
+  downloadListItems: document.getElementById('downloadListItems'),
 }
 
 console.log('DOM Elements loaded:')
@@ -101,6 +103,9 @@ async function fetchLibraries() {
       opt.textContent = name
       els.lib.appendChild(opt)
     })
+    if (els.lib.options.length > 0) {
+      els.lib.options[0].selected = true
+    }
     hideStatus()
     showStatus(`Loaded ${filtered.length} pathway libraries.`, 'success')
   } catch (err) {
@@ -139,15 +144,11 @@ async function addListToEnrichr(genes, description) {
   return js.userListId
 }
 
-async function fetchExportTSV(userListId, library) {
+async function fetchEnrichmentForLibrary(userListId, library) {
   const params = new URLSearchParams({ userListId, filename: 'enrichr_results', backgroundType: library })
   const res = await fetch(`${BASE}/export?${params.toString()}`)
-  if (!res.ok) throw new Error('export failed')
-  return await res.text()
-}
-
-// Parse Enrichr export TSV into rows with desired columns
-function parseEnrichrTSV(tsvText) {
+  if (!res.ok) throw new Error(`Enrichr export returned ${res.status} for ${library}`)
+  const tsvText = await res.text()
   const lines = tsvText.trim().split(/\r?\n/)
   if (lines.length < 2) return []
   const header = lines[0].split('\t')
@@ -157,29 +158,27 @@ function parseEnrichrTSV(tsvText) {
     p: header.indexOf('P-value'),
     cs: header.indexOf('Combined Score'),
   }
-  const rows = lines.slice(1).map((line, i) => {
-    const parts = line.split('\t')
-    const term = parts[idx.term] ?? ''
-    const overlap = parts[idx.overlap] ?? ''
-    const p = parseFloat(parts[idx.p])
-    const cs = parseFloat(parts[idx.cs])
-    let pathwayGenes = null,
-      overlapCnt = null
-    if (overlap && overlap.includes('/')) {
-      const [k, m] = overlap.split('/')
-      overlapCnt = parseInt(k, 10)
-      pathwayGenes = parseInt(m, 10)
-    }
-    return {
-      rank: i + 1,
-      Pathway: term,
-      Pathway_Genes: pathwayGenes,
-      Overlap: overlapCnt,
-      P_value: p,
-      Combined_Score: cs,
-    }
-  })
-  return rows.filter((r) => Number.isFinite(r.P_value) && Number.isFinite(r.Combined_Score))
+  return lines
+    .slice(1)
+    .map((line, i) => {
+      const parts = line.split('\t')
+      const overlap = parts[idx.overlap] ?? ''
+      let overlapCnt = null, pathwayGenes = null
+      if (overlap.includes('/')) {
+        const [k, m] = overlap.split('/')
+        overlapCnt = parseInt(k, 10)
+        pathwayGenes = parseInt(m, 10)
+      }
+      return {
+        rank: i + 1,
+        Pathway: parts[idx.term] ?? '',
+        Pathway_Genes: pathwayGenes,
+        Overlap: overlapCnt,
+        P_value: parseFloat(parts[idx.p]),
+        Combined_Score: parseFloat(parts[idx.cs]),
+      }
+    })
+    .filter((r) => Number.isFinite(r.P_value) && Number.isFinite(r.Combined_Score))
 }
 
 function renderTable(rows) {
@@ -223,7 +222,7 @@ function renderBars(rows, topN = 20) {
   })
 }
 
-function downloadCSV(rows) {
+function downloadCSV(rows, libName = 'enrichr_results') {
   const header = ['Pathway', 'Pathway_Genes', 'Overlap', 'P_value', 'Combined_Score']
   const lines = [header.join(',')].concat(
     rows.map((r) =>
@@ -240,7 +239,7 @@ function downloadCSV(rows) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = 'enrichr_results.csv'
+  a.download = `${libName.replace(/[^a-z0-9_]/gi, '_')}.csv`
   document.body.appendChild(a)
   a.click()
   a.remove()
@@ -279,42 +278,129 @@ els.csv.addEventListener('change', async () => {
   }
 })
 
-let lastRows = []
+let libraryResults = {} // { libraryName: rows[] }
+let activeLibrary = null
+
+function sortRows(rows) {
+  return els.sortSelect.checked
+    ? [...rows].sort((a, b) => a.P_value - b.P_value)
+    : [...rows].sort((a, b) => b.Combined_Score - a.Combined_Score)
+}
+
+// libStates: { [lib]: 'loading' | 'done' | 'error' }
+function renderDownloadList(allLibs, libStates = {}) {
+  els.downloadListItems.innerHTML = ''
+  allLibs.forEach((lib) => {
+    const state = libStates[lib] ?? 'done'
+    const hasResults = !!libraryResults[lib]
+    const wrapper = document.createElement('div')
+    wrapper.className = 'flex items-center gap-1'
+
+    const viewBtn = document.createElement('button')
+    viewBtn.type = 'button'
+    const isActive = lib === activeLibrary
+    if (state === 'loading') {
+      viewBtn.className =
+        'px-4 py-2 text-sm rounded-xl font-medium border border-slate-600 bg-slate-800/30 text-slate-400 cursor-not-allowed'
+      viewBtn.disabled = true
+      viewBtn.innerHTML = `<svg class="inline animate-spin h-3 w-3 mr-1 -mt-0.5" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>${lib}`
+    } else if (state === 'error') {
+      viewBtn.className =
+        'px-4 py-2 text-sm rounded-xl font-medium border border-rose-700 bg-rose-950/30 text-rose-400 cursor-not-allowed'
+      viewBtn.disabled = true
+      viewBtn.textContent = `✗ ${lib}`
+    } else {
+      viewBtn.className = isActive
+        ? 'px-4 py-2 text-sm rounded-xl font-medium bg-gradient-to-r from-cyan-500 to-fuchsia-500 text-white shadow-lg'
+        : 'px-4 py-2 text-sm rounded-xl font-medium border border-slate-700 hover:border-slate-500 bg-slate-800/40 hover:bg-slate-800/60 text-slate-300 transition-all duration-200'
+      viewBtn.textContent = lib
+      viewBtn.addEventListener('click', () => {
+        activeLibrary = lib
+        const rows = sortRows(libraryResults[lib])
+        renderBars(rows)
+        renderTable(rows)
+        renderDownloadList(allLibs, libStates)
+      })
+    }
+
+    wrapper.appendChild(viewBtn)
+
+    if (hasResults) {
+      const dlBtn = document.createElement('button')
+      dlBtn.type = 'button'
+      dlBtn.title = `Download ${lib} CSV`
+      dlBtn.className =
+        'px-2 py-2 text-sm rounded-xl border border-slate-700 hover:border-slate-500 bg-slate-800/40 hover:bg-slate-800/60 text-slate-400 hover:text-slate-200 transition-all duration-200'
+      dlBtn.innerHTML =
+        '<svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>'
+      dlBtn.addEventListener('click', () => downloadCSV(libraryResults[lib], lib))
+      wrapper.appendChild(dlBtn)
+    }
+
+    els.downloadListItems.appendChild(wrapper)
+  })
+  els.downloadList.classList.remove('hidden')
+}
 
 async function handleRun() {
   try {
     els.run.disabled = true
     els.results.classList.add('hidden')
+    libraryResults = {}
+    activeLibrary = null
 
     if (!els.csv.files[0]) throw new Error('Please choose a CSV file.')
     if (!allGenes.length) throw new Error('No genes found. Please select a valid CSV file.')
 
-    // Use only the selected number of genes (first N genes)
+    const selectedLibraries = Array.from(els.lib.selectedOptions).map((o) => o.value)
+    if (!selectedLibraries.length) throw new Error('Please select at least one library.')
+
     const selectedGeneCount = els.geneCountInput ? parseInt(els.geneCountInput.value) : allGenes.length
     const genes = allGenes.slice(0, selectedGeneCount)
-    // console.log('Using', genes.length, 'genes for enrichment.')
 
     if (genes.length < 5) throw new Error('Please provide at least 5 genes for enrichment.')
     showStatus(`Uploading ${genes.length} of ${allGenes.length} genes to Enrichr…`)
     const userListId = await addListToEnrichr(genes, els.desc.value.trim())
-    showStatus('Running enrichment & fetching results…')
-    const tsv = await fetchExportTSV(userListId, els.lib.value)
-    const rows = parseEnrichrTSV(tsv)
-    if (!rows.length) throw new Error('No enrichment results returned.')
 
-    // Sort by p-value (asc) or combined score (desc)
-    const sortByPref = () => {
-      const sorted = els.sortSelect.checked
-        ? [...rows].sort((a, b) => a.P_value - b.P_value)
-        : [...rows].sort((a, b) => b.Combined_Score - a.Combined_Score)
-      return sorted
-    }
-    lastRows = sortByPref()
-
-    renderBars(lastRows)
-    renderTable(lastRows)
+    // Show the results panel immediately and update it live as each library completes
+    const libStates = Object.fromEntries(selectedLibraries.map((l) => [l, 'loading']))
     els.results.classList.remove('hidden')
-    hideStatus()
+    renderDownloadList(selectedLibraries, libStates)
+
+    for (let i = 0; i < selectedLibraries.length; i++) {
+      const lib = selectedLibraries[i]
+      showStatus(`Running enrichment ${i + 1}/${selectedLibraries.length}: ${lib}…`)
+      try {
+        const rows = await fetchEnrichmentForLibrary(userListId, lib)
+        if (rows.length) {
+          libraryResults[lib] = rows
+          libStates[lib] = 'done'
+          // Auto-display the first completed library
+          if (!activeLibrary) {
+            activeLibrary = lib
+            renderBars(sortRows(rows))
+            renderTable(sortRows(rows))
+          }
+        } else {
+          libStates[lib] = 'error'
+          console.warn(`No results for library: ${lib}`)
+        }
+      } catch (libErr) {
+        libStates[lib] = 'error'
+        console.error(`Failed for library ${lib}:`, libErr)
+      }
+      renderDownloadList(selectedLibraries, libStates)
+    }
+
+    const completedLibs = Object.keys(libraryResults)
+    if (!completedLibs.length) throw new Error('No enrichment results returned for any selected library.')
+
+    const failCount = selectedLibraries.length - completedLibs.length
+    showStatus(
+      `Done: ${completedLibs.length} librar${completedLibs.length > 1 ? 'ies' : 'y'} completed` +
+        (failCount ? `, ${failCount} failed — see console for details.` : '.'),
+      failCount ? 'warn' : 'success'
+    )
   } catch (err) {
     console.error(err)
     showStatus(err.message || String(err), 'error')
@@ -327,16 +413,18 @@ async function handleRun() {
 els.run.addEventListener('click', handleRun)
 els.loadLibs.addEventListener('click', fetchLibraries)
 els.sortSelect.addEventListener('change', () => {
-  if (!lastRows.length) return
-  const rows = els.sortSelect.checked
-    ? [...lastRows].sort((a, b) => a.P_value - b.P_value)
-    : [...lastRows].sort((a, b) => b.Combined_Score - a.Combined_Score)
-  lastRows = rows
+  if (!activeLibrary || !libraryResults[activeLibrary]) return
+  const rows = sortRows(libraryResults[activeLibrary])
   renderBars(rows)
   renderTable(rows)
+  // Re-render list to keep active highlight (states not tracked here, just re-pass done for all known)
+  const libs = Object.keys(libraryResults)
+  if (libs.length) renderDownloadList(libs, Object.fromEntries(libs.map((l) => [l, 'done'])))
 })
 els.downloadCsv.addEventListener('click', () => {
-  if (lastRows.length) downloadCSV(lastRows)
+  if (activeLibrary && libraryResults[activeLibrary]) {
+    downloadCSV(libraryResults[activeLibrary], activeLibrary)
+  }
 })
 
 // Add input validation for the numeric input
