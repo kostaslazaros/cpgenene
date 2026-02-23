@@ -58,64 +58,15 @@
       box-shadow: 0 0 25px rgba(236, 72, 153, 0.3);
     }
 
-    /* Modern, functional slider styling */
+    /* Number input styling */
     #featureSlider {
+      -moz-appearance: textfield;
+    }
+
+    #featureSlider::-webkit-outer-spin-button,
+    #featureSlider::-webkit-inner-spin-button {
       -webkit-appearance: none;
-      appearance: none;
-      width: 100%;
-      height: 8px;
-      border-radius: 8px;
-      background: linear-gradient(90deg, rgb(88 28 135), rgb(236 72 153));
-      outline: none;
-      opacity: 0.8;
-      transition: opacity 0.2s, box-shadow 0.2s;
-      box-shadow: 0 0 15px rgba(236, 72, 153, 0.2);
-      position: relative;
-    }
-
-    #featureSlider:hover {
-      opacity: 1;
-      box-shadow: 0 0 25px rgba(236, 72, 153, 0.4);
-    }
-
-    #featureSlider:focus {
-      opacity: 1;
-      box-shadow: 0 0 30px rgba(236, 72, 153, 0.6);
-    }
-
-    #featureSlider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgb(236 72 153), rgb(219 39 119));
-      cursor: pointer;
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      box-shadow: 0 0 20px rgba(236, 72, 153, 0.6);
-      transition: all 0.2s ease;
-    }
-
-    #featureSlider::-webkit-slider-thumb:hover {
-      transform: scale(1.1);
-      box-shadow: 0 0 25px rgba(236, 72, 153, 0.8);
-    }
-
-    #featureSlider::-moz-range-thumb {
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgb(236 72 153), rgb(219 39 119));
-      cursor: pointer;
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      box-shadow: 0 0 20px rgba(236, 72, 153, 0.6);
-    }
-
-    #featureSlider::-moz-range-track {
-      height: 8px;
-      background: linear-gradient(90deg, rgb(88 28 135), rgb(236 72 153));
-      border-radius: 8px;
-      border: none;
+      margin: 0;
     }
 
     /* Mobile-specific styles */
@@ -266,15 +217,16 @@
           </select>
         </div>
 
-        <!-- Feature Count Slider -->
+        <!-- Feature Count Input -->
         <div>
           <h3 class="text-lg font-medium text-slate-300 mb-3">Number of Features</h3>
           <div class="space-y-3">
-            <input id="featureSlider" type="range" min="100" max="1000" value="500" class="w-full">
+            <input id="featureSlider" type="number" min="100" max="1000" value="500" step="1"
+              class="w-full rounded-xl border-magenta-700/50 bg-slate-800/70 text-slate-200 px-4 py-3 shadow-[0_0_10px_rgba(236,72,153,0.2)] focus:border-magenta-500 focus:ring-2 focus:ring-magenta-500/30 focus:shadow-[0_0_20px_rgba(236,72,153,0.4)] transition-all duration-200">
             <div class="flex justify-between text-sm text-slate-400">
-              <span>100</span>
-              <span id="featureCount" class="text-magenta-300 font-medium text-lg">500</span>
-              <span id="maxFeatures">-</span>
+              <span>Min: 100</span>
+              <span id="featureCount" class="hidden"></span>
+              <span>Max: <span id="maxFeatures">-</span></span>
             </div>
           </div>
         </div>

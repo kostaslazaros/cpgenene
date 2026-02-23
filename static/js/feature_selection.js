@@ -974,9 +974,17 @@ function updateFeatureCount() {
     return
   }
 
-  count.textContent = slider.value
+  // Clamp value to valid integer within min/max
+  const min = parseInt(slider.min) || 100
+  const max = parseInt(slider.max) || 1000
+  let val = parseInt(slider.value)
+  if (isNaN(val)) val = min
+  val = Math.max(min, Math.min(max, val))
+  slider.value = val
 
-  // Update download links when slider changes
+  count.textContent = val
+
+  // Update download links when value changes
   updateDownloadLinks()
 }
 
@@ -1274,11 +1282,6 @@ function setupSliderEventListeners() {
     updateFeatureCount()
   })
 
-  // Keep mousedown for manual slider functionality
-  slider.addEventListener('mousedown', function (e) {
-    // Manual slider implementation will handle this
-  })
-
   // Test initial functionality and verify slider properties
   console.log('Slider properties:')
   console.log('- min:', slider.min)
@@ -1308,46 +1311,14 @@ function setupSliderEventListeners() {
 
   updateFeatureCount()
 
-  // Global test function and manual slider implementation
+  // Global test function
   window.testSlider = function (value) {
     console.log('Setting slider value to:', value)
     slider.value = value
     slider.dispatchEvent(new Event('input'))
   }
 
-  // Fallback: Manual slider implementation if normal events don't work
-  let isDragging = false
-
-  slider.addEventListener('mousedown', function (e) {
-    isDragging = true
-    updateSliderFromMouse(e)
-  })
-
-  document.addEventListener('mousemove', function (e) {
-    if (isDragging) {
-      updateSliderFromMouse(e)
-    }
-  })
-
-  document.addEventListener('mouseup', function () {
-    if (isDragging) {
-      isDragging = false
-    }
-  })
-
-  function updateSliderFromMouse(e) {
-    const rect = slider.getBoundingClientRect()
-    const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-    const range = parseInt(slider.max) - parseInt(slider.min)
-    const newValue = parseInt(slider.min) + Math.round(percent * range)
-
-    if (newValue !== parseInt(slider.value)) {
-      slider.value = newValue
-      updateFeatureCount()
-    }
-  }
-
-  console.log('Slider event listeners attached successfully')
+  console.log('Feature input event listeners attached successfully')
   return true
 }
 
