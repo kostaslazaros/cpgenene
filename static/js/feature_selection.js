@@ -974,7 +974,16 @@ function updateFeatureCount() {
     return
   }
 
-  // Clamp value to valid integer within min/max
+  count.textContent = slider.value
+
+  // Update download links when value changes
+  updateDownloadLinks()
+}
+
+function clampFeatureCount() {
+  const slider = document.getElementById('featureSlider')
+  if (!slider) return
+
   const min = parseInt(slider.min) || 100
   const max = parseInt(slider.max) || 1000
   let val = parseInt(slider.value)
@@ -982,10 +991,7 @@ function updateFeatureCount() {
   val = Math.max(min, Math.min(max, val))
   slider.value = val
 
-  count.textContent = val
-
-  // Update download links when value changes
-  updateDownloadLinks()
+  updateFeatureCount()
 }
 
 function updateDownloadLinks() {
@@ -1271,15 +1277,16 @@ function setupSliderEventListeners() {
 
   // Remove any existing listeners to prevent duplicates
   slider.removeEventListener('input', updateFeatureCount)
-  slider.removeEventListener('change', updateFeatureCount)
+  slider.removeEventListener('change', clampFeatureCount)
 
-  // Add event listeners
+  // input: update display while typing (no clamping)
   slider.addEventListener('input', function (e) {
     updateFeatureCount()
   })
 
+  // change: clamp to valid range on blur / Enter
   slider.addEventListener('change', function (e) {
-    updateFeatureCount()
+    clampFeatureCount()
   })
 
   // Test initial functionality and verify slider properties

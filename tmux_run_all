@@ -1,9 +1,9 @@
 #!/bin/bash
 
-tmux new-session -d -s cpgene -n cpgene 'cd ~/prj/biokostas/cpgenius/ && uv run uvicorn app.start_fastapi:app --host 0.0.0.0 --port 8001 --reload; zsh' \; \
-  split-window -h 'cd ~/prj/biokostas/cpgenius/ && uv run celery -A app.celery_tasks worker -l INFO; zsh' \; \
+tmux new-session -d -s cpgene -n cpgene 'cd ~/prj/cpgenius/ && uv run uvicorn app.start_fastapi:app --host 0.0.0.0 --port 8001 --reload; zsh' \; \
+  split-window -h 'cd ~/prj/cpgenius/ && uv run celery -A app.celery_tasks worker -l INFO; zsh' \; \
   split-window -v 'htop; bash' \; \
   select-pane -t 0 \; \
-  split-window -v 'ngrok http 8001; bash' \; \
+  split-window -v 'echo ngrok http 8001; bash' \; \
   select-pane -t 0 \; \
   attach-session -t cpgene
